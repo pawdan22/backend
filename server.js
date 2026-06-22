@@ -19,6 +19,9 @@ const {
   PORT = 3000
 } = process.env;
 
+const LOGIN_COOLDOWN_MS = 10 * 60 * 1000;
+const loginCooldowns = new Map();
+
 const required = {
   DISCORD_CLIENT_ID,
   DISCORD_CLIENT_SECRET,
@@ -45,6 +48,15 @@ const adminIds = new Set(
 app.use(cors({ origin: FRONTEND_URL }));
 app.use(express.json());
 
+function getClientKey(req) {
+  return (
+    req.headers['cf-connecting-ip'] ||
+    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    req.socket.remoteAddress ||
+    'unknown'
+  );
+}
+
 function redirectWithError(message) {
   return `${FRONTEND_URL}#error=${encodeURIComponent(message)}`;
 }
@@ -53,7 +65,21 @@ app.get('/', (_req, res) => {
   res.send('VMPK Discord Auth działa.');
 });
 
-app.get('/auth/discord', (_req, res) => {
+app.get('/auth/discord', (req, res) => {
+  const key = getClientKey(req);
+  const now = Date.now();
+  const lastTry = loginCooldowns.get(key) || 0;
+  const remaining = LOGIN_COOLDOWN_MS - (now - lastTry);
+
+  if (remaining > 0) {
+    const minutes = Math.ceil(remaining / 60000);
+    return res.redirect(
+      redirectWithError(`Logowanie Discord jest chwilowo zablokowane. Spróbuj ponownie za około ${minutes} min.`)
+    );
+  }
+
+  loginCooldowns.set(key, now);
+
   const params = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
     redirect_uri: DISCORD_REDIRECT_URI,
@@ -111,14 +137,10 @@ app.get('/auth/discord/callback', async (req, res) => {
 
     const member = await memberResponse.json();
     const roles = member.roles || [];
+
     const isDriver = roles.includes(DRIVER_ROLE_ID);
     const isAdmin = adminIds.has(user.id);
     const isTrainee = false;
-
-    // Nie blokujemy już logowania po roli trainee.
-    // Backend wpuszcza każdego członka serwera Discord VMPK,
-    // a panel HTML sam sprawdza, czy użytkownik jest driverem/adminem
-    // albo czy ma zaakceptowane podanie po nicku.
 
     const displayName = member.nick || user.global_name || user.username;
 
