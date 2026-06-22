@@ -1,31 +1,21 @@
 # VMPK Discord Auth Backend
 
-Backend do logowania przez Discord i sprawdzania roli `vmpk driver`.
+Wersja z obsługą roli `trainee` i wieloma adminami.
 
-## Zmienne środowiskowe
-Skopiuj `.env.example` do `.env` lokalnie albo ustaw te wartości na hostingu.
+## Najważniejsze zmienne Render → Environment
 
-- `DISCORD_CLIENT_ID` - z Discord Developer Portal
-- `DISCORD_CLIENT_SECRET` - z Discord Developer Portal
-- `DISCORD_REDIRECT_URI` - adres callback backendu, np. `https://vmpk-auth.onrender.com/auth/discord/callback`
-- `FRONTEND_URL` - adres panelu na GitHub Pages, np. `https://twojlogin.github.io/twojerepo/`
-- `SESSION_SECRET` - długi losowy tekst
-- `GUILD_ID` - ID serwera Discord
-- `DRIVER_ROLE_ID` - ID roli kierowcy
-- `ADMIN_DISCORD_ID` - ID admina
-
-## Uruchomienie lokalne
-```bash
-npm install
-npm start
+```env
+GUILD_ID=1131905853574881290
+DRIVER_ROLE_ID=1485285606761300078
+TRAINEE_ROLE_ID=TU_WKLEJ_ID_ROLI_TRAINEE
+ADMIN_DISCORD_IDS=687348708181934122,DRUGI_ADMIN_ID,TRZECI_ADMIN_ID
 ```
 
-## Discord Developer Portal
-W aplikacji Discord dodaj Redirect URI dokładnie taki sam jak `DISCORD_REDIRECT_URI`.
+`ADMIN_DISCORD_IDS` przyjmuje wiele ID po przecinku.
 
-## Frontend
-W pliku panelu podmień:
-```js
-const AUTH_API_URL = 'https://TWOJ-BACKEND.onrender.com';
-```
-na adres swojego backendu.
+Logika dostępu:
+- `driver` → normalny dostęp do panelu,
+- `trainee` → może zalogować się i wejść do egzaminu po akceptacji podania w panelu dyspozytora,
+- `admin` z `ADMIN_DISCORD_IDS` → dostęp do panelu dyspozytora.
+
+Po zmianie plików zrób deploy na Renderze.

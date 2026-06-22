@@ -13,7 +13,10 @@ const {
   SESSION_SECRET,
   GUILD_ID = '1131905853574881290',
   DRIVER_ROLE_ID = '1485285606761300078',
-  ADMIN_DISCORD_ID = '687348708181934122',
+  TRAINEE_ROLE_ID,
+  ADMIN_ID,
+  ADMIN_DISCORD_ID,
+  ADMIN_DISCORD_IDS,
   PORT = 3000
 } = process.env;
 
@@ -22,7 +25,8 @@ const required = {
   DISCORD_CLIENT_SECRET,
   DISCORD_REDIRECT_URI,
   FRONTEND_URL,
-  SESSION_SECRET
+  SESSION_SECRET,
+  TRAINEE_ROLE_ID
 };
 
 for (const [key, value] of Object.entries(required)) {
@@ -31,6 +35,14 @@ for (const [key, value] of Object.entries(required)) {
     process.exit(1);
   }
 }
+
+const adminIds = new Set(
+  [ADMIN_ID, ADMIN_DISCORD_ID, ADMIN_DISCORD_IDS]
+    .filter(Boolean)
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
 
 app.use(cors({ origin: FRONTEND_URL }));
 app.use(express.json());
@@ -96,16 +108,17 @@ app.get('/auth/discord/callback', async (req, res) => {
     });
 
     if (!memberResponse.ok) {
-      return res.redirect(redirectWithError('Nie jesteś na serwerze Discord VMPK albo nie można sprawdzić roli.'));
+      return res.redirect(redirectWithError('Nie jesteś na serwerze Discord VMPK albo nie można sprawdzić ról.'));
     }
 
     const member = await memberResponse.json();
     const roles = member.roles || [];
     const isDriver = roles.includes(DRIVER_ROLE_ID);
-    const isAdmin = user.id === ADMIN_DISCORD_ID;
+    const isTrainee = roles.includes(TRAINEE_ROLE_ID);
+    const isAdmin = adminIds.has(user.id);
 
-    if (!isDriver && !isAdmin) {
-      return res.redirect(redirectWithError('Nie masz wymaganej roli vmpk driver.'));
+    if (!isDriver && !isTrainee && !isAdmin) {
+      return res.redirect(redirectWithError('Nie masz wymaganej roli vmpk driver ani trainee.'));
     }
 
     const displayName = member.nick || user.global_name || user.username;
@@ -116,7 +129,8 @@ app.get('/auth/discord/callback', async (req, res) => {
       discordUsername: user.username,
       avatar: user.avatar,
       isAdmin,
-      isDriver
+      isDriver,
+      isTrainee
     }, SESSION_SECRET, { expiresIn: '12h' });
 
     res.redirect(`${FRONTEND_URL}#token=${encodeURIComponent(appToken)}`);
@@ -140,7 +154,8 @@ app.get('/api/me', (req, res) => {
       discordUsername: user.discordUsername,
       avatar: user.avatar,
       isAdmin: user.isAdmin,
-      isDriver: user.isDriver
+      isDriver: user.isDriver,
+      isTrainee: user.isTrainee
     });
   } catch (_err) {
     res.status(401).json({ error: 'Token wygasł lub jest niepoprawny.' });
